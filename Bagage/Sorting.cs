@@ -7,13 +7,16 @@ using System.Threading.Tasks;
 
 namespace Bagage
 {
-    internal class Sorting
+    public class Sorting
     {
-        private Queue<Bagage> inputBuffer;
-        private Queue<Bagage> sortingBuffer;
-        private Queue<Bagage> outputBuffer1;
-        private Queue<Bagage> outputBuffer2;
-        private Queue<Bagage> outputBuffer3;
+        private readonly Queue<Bagage> inputBuffer;
+        private readonly Queue<Bagage> sortingBuffer;
+        public readonly Queue<Bagage> outputBuffer1;
+        public readonly Queue<Bagage> outputBuffer2;
+        public readonly Queue<Bagage> outputBuffer3;
+        private readonly object _lockInput = new object();
+        private readonly object _lockOutput = new object();
+        private readonly object _monitor = new object();
 
         public Sorting()
         {
@@ -26,52 +29,67 @@ namespace Bagage
 
         public void SortBagage(Queue<Bagage> bagageQueue)
         {
-            lock (inputBuffer)
+            lock (_lockInput)
             {
-                foreach (var bagage in bagageQueue)
+                foreach (Bagage bagage in bagageQueue)
                 {
                     inputBuffer.Enqueue(bagage);
                 }
             }
 
-            while (inputBuffer.Count > 0 || sortingBuffer.Count > 0)
+            while (true)
             {
-                lock (inputBuffer)
+                lock (_monitor)
                 {
-                    while (inputBuffer.Count > 0)
+                    if (inputBuffer.Count == 0 && sortingBuffer.Count == 0)
                     {
-                        Bagage bagage = inputBuffer.Dequeue();
-                        sortingBuffer.Enqueue(bagage);
-                    }
-                }
-
-                while (sortingBuffer.Count > 0)
-                {
-                    Bagage bagage;
-                    lock (sortingBuffer)
-                    {
-                        bagage = sortingBuffer.Dequeue();
+                        Monitor.PulseAll(_monitor);
+                        break;
                     }
 
-                    if (bagage.Destination == "Denmark")
+                    lock (_lockInput)
                     {
-                        outputBuffer1.Enqueue(bagage);
+                        while (inputBuffer.Count > 0)
+                        {
+                            Bagage bagage = inputBuffer.Dequeue();
+                            sortingBuffer.Enqueue(bagage);
+                        }
                     }
 
-                    else if (bagage.Destination == "Sverige")
+                    while (sortingBuffer.Count > 0)
                     {
-                        outputBuffer2.Enqueue(bagage);
+                        Bagage bagage = sortingBuffer.Dequeue();
+                        if (bagage.Destination == "Denmark")
+                        {
+                            lock (_lockOutput)
+                            {
+                                outputBuffer1.Enqueue(bagage);
+                                Monitor.Pulse(_monitor);
+                            }
+                        }
+                        else if (bagage.Destination == "Sverige")
+                        {
+                            lock (_lockOutput)
+                            {
+                                outputBuffer2.Enqueue(bagage);
+                                Monitor.Pulse(_monitor);
+                            }
+                        }
+                        else if (bagage.Destination == "Norge")
+                        {
+                            lock (_lockOutput)
+                            {
+                                outputBuffer3.Enqueue(bagage);
+                                Monitor.Pulse(_monitor);
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Ugyldig destination");
+                        }
                     }
 
-                    else if ( bagage.Destination == "Norge")
-                    {
-                        outputBuffer3.Enqueue(bagage);
-                    }
-
-                    else
-                    {
-                        Console.WriteLine("Ugyldig destination");
-                    }
+                    Monitor.Wait(_monitor);
                 }
             }
         }

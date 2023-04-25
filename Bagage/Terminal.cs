@@ -6,85 +6,54 @@ using System.Threading.Tasks;
 
 namespace Bagage
 {
-    internal class Terminal
+    public class Terminal
     {
-        // Properties
-        public int TerminalNumber { get; set; }
-        public bool IsOpen { get; set; }
-        public Queue<string> BaggageQueue { get; set; }
-        private readonly object _lock = new object();
+        private string flightDestination;
+        private Queue<Bagage> bagageQueue;
 
-        // Constructor
-        public Terminal(int terminalNumber)
+        public Terminal(string destination)
         {
-            TerminalNumber = terminalNumber;
-            IsOpen = false;
-            BaggageQueue = new Queue<string>();
+            flightDestination = destination;
+            bagageQueue = new Queue<Bagage>();
         }
 
-        // Methods
-        public void Open()
+        public void ReceiveBagage(Queue<Bagage> bagage)
         {
-            lock (_lock)
+            lock (bagageQueue)
             {
-                IsOpen = true;
-                Console.WriteLine($"Terminal {TerminalNumber} is now open");
-                Monitor.PulseAll(_lock);
+                foreach (Bagage item in bagage)
+                {
+                    if (item.Destination == flightDestination)
+                    {
+                        Monitor.Enter(bagageQueue);
+                        try
+                        {
+                            bagageQueue.Enqueue(item);
+                        }
+                        finally
+                        {
+                            Monitor.Exit(bagageQueue);
+                        }
+                    }
+                }
             }
         }
 
-        public void Close()
+        public Queue<Bagage> GetBagage()
         {
-            lock (_lock)
+            lock (bagageQueue)
             {
-                IsOpen = false;
-                Console.WriteLine($"Terminal {TerminalNumber} is now closed");
-                Monitor.PulseAll(_lock);
-            }
-        }
-
-        public void AddBaggage(string baggageNumber)
-        {
-            lock (_lock)
-            {
-                while (!IsOpen)
+                Monitor.Enter(bagageQueue);
+                try
                 {
-                    Console.WriteLine($"Terminal {TerminalNumber} is closed and cannot accept baggage");
-                    Monitor.Wait(_lock);
+                    var result = new Queue<Bagage>(bagageQueue);
+                    bagageQueue.Clear();
+                    return result;
                 }
-
-                if (BaggageQueue.Count >= 10)
+                finally
                 {
-                    Console.WriteLine($"Warning: Terminal {TerminalNumber} baggage queue is full");
+                    Monitor.Exit(bagageQueue);
                 }
-
-                BaggageQueue.Enqueue(baggageNumber);
-                Console.WriteLine($"Baggage {baggageNumber} added to Terminal {TerminalNumber} queue");
-                Monitor.PulseAll(_lock);
-            }
-        }
-
-        public string RetrieveBaggage()
-        {
-            lock (_lock)
-            {
-                while (!IsOpen)
-                {
-                    Console.WriteLine($"Terminal {TerminalNumber} is closed and cannot retrieve baggage");
-                    Monitor.Wait(_lock);
-                }
-
-                if (BaggageQueue.Count == 0)
-                {
-                    Console.WriteLine($"Warning: Terminal {TerminalNumber} baggage queue is empty");
-                    Monitor.PulseAll(_lock);
-                    return null;
-                }
-
-                string baggageNumber = BaggageQueue.Dequeue();
-                Console.WriteLine($"Baggage {baggageNumber} retrieved from Terminal {TerminalNumber} queue");
-                Monitor.PulseAll(_lock);
-                return baggageNumber;
             }
         }
     }

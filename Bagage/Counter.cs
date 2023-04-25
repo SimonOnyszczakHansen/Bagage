@@ -6,50 +6,66 @@ using System.Threading.Tasks;
 
 namespace Bagage
 {
-    internal class Counter
+    public class Counter
     {
         private Queue<Bagage> outputBuffer;
-        private int _counterNumber;
-        private bool _isOpen;
-        private object _lockObject = new object();
+        private int CounterNumber;
+        public bool isOpen;
+        private readonly object _lock = new object();
+        private readonly object _monitor = new object();
 
         public Counter(int counterNumber)
         {
-            _counterNumber = counterNumber;
-            outputBuffer = new Queue<Bagage>(); 
+            CounterNumber = counterNumber;
+            outputBuffer = new Queue<Bagage>();
         }
 
         public void Open()
         {
-            lock (_lockObject)
+            lock (_lock)
             {
-                if (!_isOpen)
+                if (isOpen != true)
                 {
-                    _isOpen = true;
-                    Console.WriteLine($"Counter {_counterNumber} er åben!");
+                    isOpen = true;
+                    Console.WriteLine($"Counter {CounterNumber} er åben!");
+                    Monitor.PulseAll(_monitor);
                 }
             }
         }
 
         public void Close()
         {
-            lock (_lockObject)
+            lock (_lock)
             {
-                if (_isOpen)
+                if (isOpen != false)
                 {
-                    _isOpen = false;
-                    Console.WriteLine($"Counter {_counterNumber} er lukket");
+                    isOpen = false;
+                    Console.WriteLine($"Counter {CounterNumber} er lukket");
+                    Monitor.PulseAll(_monitor);
                 }
             }
         }
+
         public void ReceiveBagage(Bagage bagage)
         {
-            outputBuffer.Enqueue(bagage);
+            lock (_monitor)
+            {
+                outputBuffer.Enqueue(bagage);
+                Monitor.PulseAll(_monitor);
+            }
         }
 
         public void SendBagageToSorting(Sorting sorting)
         {
-            sorting.SortBagage(outputBuffer);
+            lock (_monitor)
+            {
+                while (outputBuffer.Count == 0)
+                {
+                    Monitor.Wait(_monitor);
+                }
+
+                sorting.SortBagage(outputBuffer);
+            }
         }
     }
 }

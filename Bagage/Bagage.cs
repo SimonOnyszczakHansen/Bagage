@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Bagage
 {
-    internal class Bagage
+    public class Bagage
     {
         public string Destination { get; set; }
         public int Weight { get; set; }
