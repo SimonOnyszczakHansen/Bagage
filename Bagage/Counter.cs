@@ -8,11 +8,11 @@ namespace Bagage
 {
     public class Counter
     {
-        private Queue<Bagage> outputBuffer;
-        private int CounterNumber;
-        public bool isOpen;
-        private readonly object _lock = new object();
-        private readonly object _monitor = new object();
+        private Queue<Bagage> outputBuffer;//A queue to hold the bagage recieved by the counter
+        private int CounterNumber;//Number of the counter
+        public bool isOpen;//A bool that indicates if the counter is open or closed
+        private readonly object _lock = new object();//A lock object synchronizing access to the isOpen field
+        private readonly object _monitor = new object();//A monitor object to synchronize access to the outputbuffer field
 
         public Counter(int counterNumber)
         {
@@ -27,8 +27,8 @@ namespace Bagage
                 if (isOpen != true)
                 {
                     isOpen = true;
-                    Console.WriteLine($"Counter {CounterNumber} er åben!");
-                    Monitor.PulseAll(_monitor);
+                    Console.WriteLine($"Counter {CounterNumber} er åben!");//Tell the user that the counter is open
+                    Monitor.PulseAll(_monitor);//Signal all waiting threads that the state of the counter has changed
                 }
             }
         }
@@ -40,8 +40,8 @@ namespace Bagage
                 if (isOpen != false)
                 {
                     isOpen = false;
-                    Console.WriteLine($"Counter {CounterNumber} er lukket");
-                    Monitor.PulseAll(_monitor);
+                    Console.WriteLine($"Counter {CounterNumber} er lukket");//Tell the user that the counter is closed
+                    Monitor.PulseAll(_monitor);//Signal all waiting threads that the state of the outputbuffer queue has changed
                 }
             }
         }
@@ -50,8 +50,8 @@ namespace Bagage
         {
             lock (_monitor)
             {
-                outputBuffer.Enqueue(bagage);
-                Monitor.PulseAll(_monitor);
+                outputBuffer.Enqueue(bagage);//Add the bagage to the ooutputbuffer queue
+                Monitor.PulseAll(_monitor);//Signal all waiting threads that the state of the outputbuffer quueue has changed
             }
         }
 
@@ -61,10 +61,10 @@ namespace Bagage
             {
                 while (outputBuffer.Count == 0)
                 {
-                    Monitor.Wait(_monitor);
+                    Monitor.Wait(_monitor);//Wait until there is at least one bagage in the queue
                 }
 
-                sorting.SortBagage(outputBuffer);
+                sorting.SortBagage(outputBuffer);//send the bagage to the sorting area 
             }
         }
     }
